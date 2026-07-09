@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>霓虹極光貪食蛇 | 終極穩定版</title>
+    <style>
+        /* =========================================
+           終極防呆純 CSS：無外部依賴，保證渲染
+           ========================================= */
+        body {
+            margin: 0; padding: 15px; min-height: 100vh;
+            background-color: #020617; /* 純深色背景 */
+            color: #f1f5f9;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            touch-action: none; overflow: hidden;
+            box-sizing: border-box;
+        }
+        * { box-sizing: inherit; }
+
+        /* 頂部標題 */
+        .header { text-align: center; margin-bottom: 10px; width: 100%; max-width: 450px; }
+        .header h1 {
+            margin: 0; font-size: 26px; font-weight: 800; letter-spacing: 2px;
+            color: #a855f7; text-shadow: 0 0 10px rgba(168,85,247,0.5);
+        }
+        .header p { margin: 5px 0 0 0; font-size: 12px; color: #94a3b8; }
+
+        /* 控制面板 */
+        .panel {
+            width: 100%; max-width: 450px; margin-bottom: 15px;
+            background: rgba(30, 41, 59, 0.8); border: 1px solid #334155;
+            border-radius: 12px; padding: 12px 15px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .scores { display: flex; gap: 20px; }
+        .score-box { display: flex; flex-direction: column; }
+        .score-label { font-size: 10px; color: #94a3b8; font-weight: bold; }
+        .score-val { font-size: 18px; font-weight: bold; font-family: monospace; }
+        .score-val.cyan { color: #22d3ee; }
+        .score-val.pink { color: #f472b6; }
+
+        .buttons { display: flex; gap: 8px; }
+        .btn {
+            background: #334155; border: none; color: white; padding: 8px 12px;
+            border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .btn:active { background: #475569; transform: scale(0.95); }
+
+        /* 遊戲區塊 */
+        .game-wrapper {
+            position: relative; width: 100%; max-width: 450px; aspect-ratio: 1 / 1;
+            background: #000; border: 2px solid #a855f7; border-radius: 12px;
+            box-shadow: 0 0 20px rgba(168,85,247,0.3); overflow: hidden;
+        }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* 覆蓋選單 */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(2, 6, 23, 0.9); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; text-align: center;
+            transition: opacity 0.2s; z-index: 10; padding: 20px;
+        }
+        .overlay.hidden { display: none; }
+        .menu h2 { font-size: 22px; margin: 10px 0 5px 0; color: white; }
+        .menu p { font-size: 13px; color: #94a3b8; margin-bottom: 20px; }
+        
+        .diff-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+        .diff-btn {
+            background: #1e293b; color: #94a3b8; border: 1px solid #334155;
+            padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+        }
+        .diff-btn.active { background: #a855f7; color: white; border-color: #d8b4fe; font-weight: bold; }
+
+        .start-btn {
+            background: linear-gradient(90deg, #9333ea, #db2777);
+            color: white; border: none; padding: 12px 30px; font-size: 16px;
+            border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%;
+        }
+        .start-btn:active { transform: translateY(2px); }
+
+        /* 手機方向鍵 */
+        .mobile-controls {
+            display: none; width: 100%; max-width: 300px; margin-top: 15px;
+            grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px;
+        }
+        @media (max-width: 768px) { .mobile-controls { display: grid; } }
+        .d-btn {
+            background: #1e293b; border: 1px solid #334155; color: white;
+            font-size: 20px; padding: 12px 0; border-radius: 10px; cursor: pointer;
+        }
+        .d-btn:active { background: #a855f7; transform: scale(0.95); }
+        .up { grid-column: 2; grid-row: 1; }
+        .left { grid-column: 1; grid-row: 2; }
+        .down { grid-column: 2; grid-row: 2; }
+        .right { grid-column: 3; grid-row: 2; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🐍 NEON SNAKE</h1>
+        <p>極光霓虹 8-Bit 貪食蛇</p>
+    </div>
+
+    <div class="panel">
+        <div class="scores">
+            <div class="score-box">
+                <span class="score-label">SCORE</span>
+                <span id="score" class="score-val cyan">0000</span>
+            </div>
+            <div class="score-box" style="border-left: 1px solid #334155; padding-left: 15px;">
+                <span class="score-label">BEST</span>
+                <span id="high-score" class="score-val pink">0000</span>
+            </div>
+        </div>
+        <div class="buttons">
+            <button id="mute-btn" class="btn">🔊</button>
+            <button id="pause-btn" class="btn">⏸️ 暫停</button>
+        </div>
+    </div>
+
+    <div class="game-wrapper" id="game-wrapper">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="overlay" class="overlay">
+            <div id="menu-screen" class="menu">
+                <div style="font-size: 40px; margin-bottom: 10px;">🎮</div>
+                <h2>準備好挑戰了嗎？</h2>
+                <p>使用方向鍵、或在畫面上滑動控制</p>
+                
+                <div class="diff-row">
+                    <button onclick="setDifficulty('easy')" id="diff-easy" class="diff-btn">新手</button>
+                    <button onclick="setDifficulty('medium')" id="diff-medium" class="diff-btn active">經典</button>
+                    <button onclick="setDifficulty('hard')" id="diff-hard" class="diff-btn">地獄</button>
+                </div>
+                <button id="start-btn" class="start-btn">▶️ 開始遊戲</button>
+            </div>
+
+            <div id="gameover-screen" class="menu" style="display: none;">
+                <div style="font-size: 40px; margin-bottom: 10px;">💀</div>
+                <h2 style="color: #f43f5e;">GAME OVER</h2>
+                <p>挑戰失敗！你撞到了牆壁或自己。</p>
+                <button id="restart-btn" class="start-btn" style="background: linear-gradient(90deg, #059669, #0d9488);">🔄 再試一次</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="mobile-controls">
+        <button id="ctrl-up" class="d-btn up">⬆️</button>
+        <button id="ctrl-left" class="d-btn left">⬅️</button>
+        <button id="ctrl-down" class="d-btn down">⬇️</button>
+        <button id="ctrl-right" class="d-btn right">➡️</button>
+    </div>
+    
+    <p style="color: #64748b; font-size: 11px; margin-top: 15px;">電腦提示：使用 W A S D 或 方向鍵 操控</p>
+
+    <script>
+        // --- 1. Web Audio API 音效 (加入 Try Catch 防止瀏覽器阻擋導致黑屏) ---
+        const SoundEffects = {
+            ctx: null, muted: false,
+            init() {
+                if (!this.ctx) {
+                    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+                    catch (e) { console.warn("音效初始化失敗", e); }
+                }
+            },
+            play(type) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    const now = this.ctx.currentTime;
+
+                    if (type === 'eat') {
+                        osc.type = 'triangle'; osc.frequency.setValueAtTime(300, now);
+                        osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+                        gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                        osc.start(now); osc.stop(now + 0.15);
+                    } else if (type === 'golden') {
+                        osc.type = 'sine'; osc.frequency.setValueAtTime(600, now); osc.frequency.setValueAtTime(900, now + 0.08);
+                        gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                        osc.start(now); osc.stop(now + 0.2);
+                    } else if (type === 'shield') {
+                        osc.type = 'square'; osc.frequency.setValueAtTime(200, now); osc.frequency.linearRampToValueAtTime(1000, now + 0.3);
+                        gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                        osc.start(now); osc.stop(now + 0.3);
+                    } else if (type === 'gameover') {
+                        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(400, now); osc.frequency.linearRampToValueAtTime(80, now + 0.6);
+                        gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                        osc.start(now); osc.stop(now + 0.6);
+                    } else if (type === 'move') {
+                        osc.type = 'triangle'; osc.frequency.setValueAtTime(120, now);
+                        gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
+                        osc.start(now); osc.stop(now + 0.04);
+                    }
+                } catch (e) {}
+            }
+        };
+
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const GRID_SIZE = 20; 
+        let tileCount = 0; let tileSize = 0;
+        let snake = []; let dx = 1; let dy = 0; let nextDx = 1; let nextDy = 0;
+        let food = { x: 5, y: 5, type: 'normal' }; 
+        let particles = []; 
+        let score = 0; let highScore = localStorage.getItem('neon_snake_highscore') || 0;
+        let gameInterval = null; let isPaused = false; let isPlaying = false; let hasShield = false; 
+        let gameSpeed = 100; 
+
+        document.getElementById('high-score').textContent = String(highScore).padStart(4, '0');
+
+        // 強化畫布縮放，防呆處理，確保即使 CSS 失效也有預設大小
+        function resizeCanvas() {
+            const wrapper = document.getElementById('game-wrapper');
+            let size = wrapper.clientWidth;
+            if (size === 0) size = Math.min(window.innerWidth - 30, 450); // 防黑屏機制
+            
+            canvas.width = size; canvas.height = size;
+            tileCount = GRID_SIZE; tileSize = size / tileCount;
+            
+            if (!isPlaying) drawPlaceholder();
+            else draw();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        function setDifficulty(diff) {
+            ['easy', 'medium', 'hard'].forEach(d => {
+                const btn = document.getElementById(`diff-${d}`);
+                if (d === diff) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            if (diff === 'easy') gameSpeed = 140;
+            else if (diff === 'medium') gameSpeed = 95;
+            else if (diff === 'hard') gameSpeed = 65;
+        }
+
+        function drawPlaceholder() {
+            ctx.fillStyle = '#020617'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(168, 85, 247, 0.1)'; ctx.lineWidth = 1;
+            for (let i = 0; i < tileCount; i++) {
+                ctx.beginPath(); ctx.moveTo(i * tileSize, 0); ctx.lineTo(i * tileSize, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i * tileSize); ctx.lineTo(canvas.width, i * tileSize); ctx.stroke();
+            }
+        }
+
+        function generateFood() {
+            let newX, newY; let onSnake = true;
+            while (onSnake) {
+                newX = Math.floor(Math.random() * tileCount);
+                newY = Math.floor(Math.random() * tileCount);
+                onSnake = snake.some(s => s.x === newX && s.y === newY);
+            }
+            const rand = Math.random();
+            let type = 'normal';
+            if (rand > 0.90) type = 'shield'; else if (rand > 0.75) type = 'golden';
+            food = { x: newX, y: newY, type: type };
+        }
+
+        function createExplosion(x, y, color) {
+            const px = x * tileSize + tileSize / 2; const py = y * tileSize + tileSize / 2;
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: px, y: py, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
+                    radius: Math.random() * 3 + 1, alpha: 1, decay: Math.random() * 0.05 + 0.02, color: color
+                });
+            }
+        }
+
+        function startGame() {
+            snake = [ { x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 } ];
+            dx = 1; dy = 0; nextDx = 1; nextDy = 0;
+            score = 0; hasShield = false; particles = [];
+            
+            document.getElementById('score').textContent = "0000";
+            document.getElementById('overlay').classList.add('hidden');
+            
+            generateFood(); isPlaying = true; isPaused = false;
+            document.getElementById('pause-btn').innerHTML = "⏸️ 暫停";
+            
+            SoundEffects.play('eat');
+            if (gameInterval) clearInterval(gameInterval);
+            gameInterval = setInterval(gameLoop, gameSpeed);
+        }
+
+        function gameLoop() {
+            if (isPaused) return;
+            update(); draw();
+        }
+
+        function update() {
+            dx = nextDx; dy = nextDy;
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                if (hasShield) { useShield(); return; } else { gameOver(); return; }
+            }
+            for (let i = 0; i < snake.length; i++) {
+                if (snake[i].x === head.x && snake[i].y === head.y) {
+                    if (hasShield) { useShield(); return; } else { gameOver(); return; }
+                }
+            }
+
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                let scoreAdd = 10; let pColor = '#a855f7'; 
+                if (food.type === 'normal') { scoreAdd = 10; pColor = '#22c55e'; SoundEffects.play('eat'); }
+                else if (food.type === 'golden') { scoreAdd = 30; pColor = '#eab308'; SoundEffects.play('golden'); }
+                else if (food.type === 'shield') { scoreAdd = 15; hasShield = true; pColor = '#06b6d4'; SoundEffects.play('shield'); }
+
+                score += scoreAdd; document.getElementById('score').textContent = String(score).padStart(4, '0');
+                createExplosion(food.x, food.y, pColor); generateFood();
+            } else {
+                snake.pop();
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i]; p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function useShield() {
+            hasShield = false; SoundEffects.play('gameover'); 
+            createExplosion(snake[0].x, snake[0].y, '#06b6d4');
+            nextDx = -dx; nextDy = -dy;
+        }
+
+        function draw() {
+            ctx.fillStyle = '#020617'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'; ctx.lineWidth = 1;
+            for (let i = 0; i < tileCount; i++) {
+                ctx.beginPath(); ctx.moveTo(i * tileSize, 0); ctx.lineTo(i * tileSize, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i * tileSize); ctx.lineTo(canvas.width, i * tileSize); ctx.stroke();
+            }
+
+            const pad = 2; const fx = food.x * tileSize + pad; const fy = food.y * tileSize + pad; const fSize = tileSize - pad * 2;
+            ctx.save();
+            if (food.type === 'normal') { ctx.fillStyle = '#ef4444'; ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(fx+fSize/2, fy+fSize/2, fSize/2, 0, Math.PI*2); ctx.fill(); }
+            else if (food.type === 'golden') { ctx.fillStyle = '#eab308'; ctx.shadowColor = '#eab308'; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(fx+fSize/2, fy+fSize/2, fSize/2, 0, Math.PI*2); ctx.fill(); }
+            else if (food.type === 'shield') { ctx.fillStyle = '#06b6d4'; ctx.shadowColor = '#06b6d4'; ctx.shadowBlur = 15; ctx.fillRect(fx, fy, fSize, fSize); }
+            ctx.restore();
+
+            snake.forEach((segment, index) => {
+                const sx = segment.x * tileSize; const sy = segment.y * tileSize; const r = index === 0 ? tileSize * 0.4 : tileSize * 0.3; 
+                ctx.save();
+                const hue = (180 + index * 8) % 360;
+                ctx.fillStyle = `hsla(${hue}, 85%, 60%, 1)`; ctx.shadowColor = `hsla(${hue}, 85%, 60%, 0.8)`; ctx.shadowBlur = index === 0 ? 15 : 6;
+                ctx.beginPath(); ctx.arc(sx+tileSize/2, sy+tileSize/2, r, 0, Math.PI*2); ctx.fill();
+                
+                if (index === 0 && hasShield) { ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sx+tileSize/2, sy+tileSize/2, r+4, 0, Math.PI*2); ctx.stroke(); }
+                if (index === 0) {
+                    ctx.fillStyle = '#ffffff'; let eX1, eY1, eX2, eY2;
+                    if (dx === 1) { eX1 = sx+tileSize*0.6; eY1 = sy+tileSize*0.3; eX2 = sx+tileSize*0.6; eY2 = sy+tileSize*0.7; }
+                    else if (dx === -1) { eX1 = sx+tileSize*0.4; eY1 = sy+tileSize*0.3; eX2 = sx+tileSize*0.4; eY2 = sy+tileSize*0.7; }
+                    else if (dy === 1) { eX1 = sx+tileSize*0.3; eY1 = sy+tileSize*0.6; eX2 = sx+tileSize*0.7; eY2 = sy+tileSize*0.6; }
+                    else { eX1 = sx+tileSize*0.3; eY1 = sy+tileSize*0.4; eX2 = sx+tileSize*0.7; eY2 = sy+tileSize*0.4; }
+                    ctx.beginPath(); ctx.arc(eX1, eY1, 2, 0, Math.PI*2); ctx.arc(eX2, eY2, 2, 0, Math.PI*2); ctx.fill();
+                }
+                ctx.restore();
+            });
+
+            particles.forEach(p => {
+                ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 5;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); ctx.restore();
+            });
+        }
+
+        function gameOver() {
+            isPlaying = false; if (gameInterval) clearInterval(gameInterval); SoundEffects.play('gameover');
+            if (score > highScore) { highScore = score; localStorage.setItem('neon_snake_highscore', highScore); document.getElementById('high-score').textContent = String(highScore).padStart(4, '0'); }
+            
+            document.getElementById('menu-screen').style.display = 'none';
+            document.getElementById('gameover-screen').style.display = 'flex';
+            document.getElementById('overlay').classList.remove('hidden');
+        }
+
+        function changeDirection(direction) {
+            if (!isPlaying || isPaused) return;
+            switch (direction) {
+                case 'UP': if (dy !== 1) { nextDx = 0; nextDy = -1; SoundEffects.play('move'); } break;
+                case 'DOWN': if (dy !== -1) { nextDx = 0; nextDy = 1; SoundEffects.play('move'); } break;
+                case 'LEFT': if (dx !== 1) { nextDx = -1; nextDy = 0; SoundEffects.play('move'); } break;
+                case 'RIGHT': if (dx !== -1) { nextDx = 1; nextDy = 0; SoundEffects.play('move'); } break;
+            }
+        }
+
+        window.addEventListener('keydown', e => {
+            if (['ArrowUp', 'KeyW'].includes(e.code)) changeDirection('UP');
+            else if (['ArrowDown', 'KeyS'].includes(e.code)) changeDirection('DOWN');
+            else if (['ArrowLeft', 'KeyA'].includes(e.code)) changeDirection('LEFT');
+            else if (['ArrowRight', 'KeyD'].includes(e.code)) changeDirection('RIGHT');
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+        });
+
+        let tX = 0; let tY = 0;
+        canvas.addEventListener('touchstart', e => { tX = e.touches[0].clientX; tY = e.touches[0].clientY; e.preventDefault(); }, { passive: false });
+        canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+        canvas.addEventListener('touchend', e => {
+            if (!tX || !tY) return;
+            let dX = e.changedTouches[0].clientX - tX; let dY = e.changedTouches[0].clientY - tY;
+            if (Math.abs(dX) > Math.abs(dY)) { if (Math.abs(dX) > 30) dX > 0 ? changeDirection('RIGHT') : changeDirection('LEFT'); }
+            else { if (Math.abs(dY) > 30) dY > 0 ? changeDirection('DOWN') : changeDirection('UP'); }
+            tX = 0; tY = 0;
+        });
+
+        document.getElementById('ctrl-up').addEventListener('pointerdown', () => changeDirection('UP'));
+        document.getElementById('ctrl-down').addEventListener('pointerdown', () => changeDirection('DOWN'));
+        document.getElementById('ctrl-left').addEventListener('pointerdown', () => changeDirection('LEFT'));
+        document.getElementById('ctrl-right').addEventListener('pointerdown', () => changeDirection('RIGHT'));
+
+        document.getElementById('pause-btn').addEventListener('click', () => {
+            if (!isPlaying) return;
+            isPaused = !isPaused;
+            const btn = document.getElementById('pause-btn');
+            if (isPaused) {
+                btn.innerHTML = "▶️ 繼續";
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ffffff'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText('遊戲暫停中', canvas.width/2, canvas.height/2);
+            } else {
+                btn.innerHTML = "⏸️ 暫停";
+            }
+        });
+
+        document.getElementById('mute-btn').addEventListener('click', () => {
+            SoundEffects.muted = !SoundEffects.muted;
+            document.getElementById('mute-btn').innerHTML = SoundEffects.muted ? "🔇" : "🔊";
+            if (!SoundEffects.muted) SoundEffects.play('eat');
+        });
+
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            document.getElementById('gameover-screen').style.display = 'none';
+            document.getElementById('menu-screen').style.display = 'flex';
+            startGame();
+        });
+
+        window.onload = function() {
+            setTimeout(() => { setDifficulty('medium'); resizeCanvas(); }, 100);
+        };
+    </script>
+</body>
+</html>
